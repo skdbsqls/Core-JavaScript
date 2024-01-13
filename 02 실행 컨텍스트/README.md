@@ -279,7 +279,7 @@ console.log(c);
 
 두 개의 sum 함수는 각자의 의도대로 잘 동작할 것이고, 처음 선언한 100번째 줄 보다 이전에 sum 함수를 호출하는 경우 그 줄에서 바로 에러가 검출되므로 **더욱 손쉽게 디버깅 할 수 있다.**
 
-## 스코프, 스코프 체인, outerEnvironmentReference
+## 3. 스코프, 스코프 체인, outerEnvironmentReference
 
 > **스코프란 식별자에 대한 유효범위이고, 스코프 체인이란 식별자의 유효범위를 안에서부터 바깥으로 차례로 검색해나가는 것**이다. 이를 가능케 하는 것이 바로 LexicalEnvironment의 두 번째 수집 자료인 outerEnvironmentReference이다.
 
