@@ -278,3 +278,110 @@ console.log(c);
 그렇다면 **두 개의 sum 함수가 모두 함수 표현식으로 정의**된다면?
 
 두 개의 sum 함수는 각자의 의도대로 잘 동작할 것이고, 처음 선언한 100번째 줄 보다 이전에 sum 함수를 호출하는 경우 그 줄에서 바로 에러가 검출되므로 **더욱 손쉽게 디버깅 할 수 있다.**
+
+## 스코프, 스코프 체인, outerEnvironmentReference
+
+> **스코프란 식별자에 대한 유효범위이고, 스코프 체인이란 식별자의 유효범위를 안에서부터 바깥으로 차례로 검색해나가는 것**이다. 이를 가능케 하는 것이 바로 LexicalEnvironment의 두 번째 수집 자료인 outerEnvironmentReference이다.
+
+### 스코프
+
+**ES5까지의 자바스크립트는** 특이하게도 전역공간을 제외하면 **오직 함수에 의해서만 스코프가 생성**되었다. 하지만 **ES6부터 블록에 의해서도 스코프 경계가 발생**하게 되었다. 다만, 이러한 블록은 var로 선언한 변수에 대해서는 작용하지 않고 오직 새로 생긴 **let, const, strict mode에서의 함수 선언 등에서만** 범위로서의 역할을 수행한다.
+
+ES6에서는 이를 구분하기 위해 함수 스코프, 블록 스코프라는 용어를 사용한다.
+
+- **함수 스코프**
+  함수 스코프는 함수에서 선언한 변수는 해당 함수 내에서만 접근 가능하다. 한편, 변수가 함수 내부에 선언된 것이 아니면 이 변수의 스코프는 전역 스코프이므로 어디에서든 접근이 가능하다.
+
+  ```javascript
+  function abc() {
+    var aa = "12"; // 함수 내부에서 선언
+  }
+  console.log(aa); // Uncaught ReferenceError: aa is not defined
+
+  if (true) {
+    var abc = "123"; // 함수 내부에서 선언 X
+  }
+  console.log(abc); // 123
+  ```
+
+- **블록 스코프**
+  블록 스코프는 블록(`{ }`) 내부에서 선언된 변수는 해당 블록에서만 접근 가능하다.
+  ```javascript
+  // var로 선언 : 함수 스코프
+  function loop() {
+    for (var i = 0; i < 5; i++) {
+      console.log(i);
+    }
+    console.log("final", i);
+  }
+  loop();
+  /*
+      0
+      1
+      2
+      3
+      4
+      final 5
+  */
+  // let으로 선언 : 블록 스코프
+  function loop() {
+    for (let i = 0; i < 5; i++) {
+      console.log(i);
+    }
+    console.log("final", i);
+  }
+  loop(); /* ReferenceError: i is not defined */
+  ```
+
+### 스코프 체인
+
+outerEnvironmentReference는 현재 호출된 함수가 **선언될 당시**의 LexicalEnvironment를 참조한다. '선언하다'라는 행위가 실제로 일어날 수 있는 시점이란 콜 스택 상에서 **어떤 실행 컨텍스트가 활성화된 상태일 때**뿐이다. 어떤 함수를 선언하는 행위 자체도 하나의 코드에 지니지 않으며, **모든 코드는 실행 컨텍스트가 활성화 상태일 때 실행**되기 때문이다.
+
+예를 들어, A 함수 내부에 B 함수를 선언하고 다시 B 함수 내부에 C 함수를 선언한 경우,
+함수 C의 outerEnvironmentReference는 함수 B의 LexicalEnvironment를 참조하고, 함수 B의 outerEnvironmentReference는 다시 함수 B가 선언되던 때(A)의 LexicalEnvironment를 참조한다.
+
+이처럼 outerEnvironmentReference는 연결리스트 형태를 띈다. 이런 구조적 특성 덕분에 **여러 스코프에서 동일한 식별자를 선언한 경우에는 무조건 스코프 체인 상에서 가장 먼저 발견된 식별자에만 접근 가능**하게 된다.
+
+```javascript
+// 스코프 체인
+var a = 1;
+var outer = function () {
+  var inner = function () {
+    console.log(a);
+    var a = 3;
+  };
+  inner();
+  console.log(a);
+};
+outer();
+console.log(a);
+```
+
+![](https://velog.velcdn.com/images/skdbsqls/post/dc9630f2-23f8-4826-8d9f-be05967d3a41/image.png)
+
+전역 공간에서는 전역 스코프에서 생성된 변수에만 접근할 수 있다. outer 함수 내부에서는 outer 및 전역 스코프에서 생성된 변수에 접근할 수 있지만, inner 내부에서 생성된 변수에는 접근하지 못 한다. inner 함수 내부에서는 inner, outer, 전역 스코프 모두에 접근할 수 있다.
+
+> 다만, 스코프 체인 상에 있는 변수라고 해서 무조건 접근 가능한 것은 아니다. inner 함수 내부에서 a 변수를 선언했기 때문에 전역 공간에서 선언한 동일한 이름의 a 변수에는 접근할 수 없는 셈이다. 이는 **변수 은닉화**라고 한다.
+
+### 전역변수와 지역변수
+
+**전역 공간에서 선언한 변수는 전역변수이고, 함수 내부에서 선언한 변수는 무조건 지역변수이다.**
+코드의 안전성을 위해서는 가급적 전역변수 사용을 최소화하고자 노력하는 것이 좋다.
+
+## 4. this
+
+실행 컨텍스트의 thisBinding에는 this로 지정된 객체가 저장된다. 실행 컨텍스트 활성화 당시에 this가 지정되지 않은 경우 this에는 전역 객체가 저장된다. 그밖에는 함수를 호출하는 방법에 따라 this에 저장되는 대상이 다르다.
+
+> ## 📌 정리
+
+- 실행 컨텍스트는 실행할 코드에 제공할 환경 정보들을 모아놓은 객체로, 전역 공간에서 자동으로 생성되는 전역 컨텍스트와 eval 및 함수 실행에 의한 컨텍스트 등이 있다.
+- 실행 컨텍스트 객체는 활성화되는 시점에 VariableEnvironment, LexicalEnvironment, Thisbinding의 세 가지 정보를 수집한다.
+- 실행 컨텍스트를 생성할 때는 VariableEnvironment와 LexicalEnvironment는 동일한 내용으로 구성되지만 LexicalEnvironment는 함수 실행 도중에 변경되는 사항이 즉시 반영되는 반면 VariableEnvironment는 초기 상태를 유지한다.
+- VariableEnvironment와 LexicalEnvironment는 매개변수명, 변수의 식별자, 선언한 함수의 함수명 등을 수집하는 envrionmentRecord와 바로 직전 컨텍스트의 LexicalEnvironment 정보를 참조하는 outerEnvironmentReference로 구성돼 있다.
+- 호이스팅은 코드 해석을 좀 더 수월하게 하기 위해 envrionmentRecord의 수집 과정을 추상화한 개념으로, 실행 컨텍스트가 관여하는 코드 집단의 최상단으로 이들을 '끌어올린다'고 해석하는 것이다.
+- 변수 선언과 값 할당이 동시에 이뤄진 문장은 '선언부'만을 호이스팅하고, 할당 과정은 원래 자리에 남아있게 되는데, 여기서 함수 선언문과 함수 표현식의 차이가 발생한다.
+- 스코프는 변수의 유효범위를 말한다.
+- outerEnvironmentReference는 해당 함수가 선언된 위치의 LexicalEnvironment를 참조한다.
+- 코드 상에서 어떤 변수에 접근하려고 하면 현재 컨텍스트의 LexicalEnvironment를 탐색해서 발견되면 그 값을 반환하고, 발견하지 못할 경우 다시 outerEnvironmentReference에 담긴 LexicalEnvironment를 탐색하는 과정을 거친다.
+- 전역 컨텍스트의 LexicalEnvironment에 담긴 변수를 전역변수, 그 밖의 함수에 의해 생성된 실행 컨텍스트의 변수들은 모두 지역 변수이다.
+- this에는 실행 컨텍스트를 활성화하는 당시에 지정된 this가 저장되는데, 지정되지 않은 경우에는 전역 객체가 저장된다.
